@@ -46,6 +46,13 @@ The checksum file uses the standard `sha256sum` format:
 <64-character SHA-256>  texo-x86_64-unknown-linux-gnu.tar.gz
 ```
 
+`fabricaup install` discovers the highest stable `vMAJOR.MINOR.PATCH` release
+that contains both the archive and checksum for the current platform. A tool
+repository may also publish database bundles or other auxiliary GitHub Releases;
+those releases are ignored. Drafts, prereleases, and releases missing either
+required platform asset are also excluded from `latest` discovery. Users may
+still request an exact release tag explicitly.
+
 New tools require no fabricaup code changes. If `fabrica-eda/struo` publishes
 assets that follow this contract, users can install it with:
 

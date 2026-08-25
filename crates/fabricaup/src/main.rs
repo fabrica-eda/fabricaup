@@ -55,6 +55,10 @@ enum Command {
 #[derive(Debug, Deserialize)]
 struct Release {
     tag_name: String,
+    #[serde(default)]
+    draft: bool,
+    #[serde(default)]
+    prerelease: bool,
     assets: Vec<Asset>,
 }
 
@@ -155,7 +159,12 @@ fn install(layout: &Layout, tool: &str, repo: &str, requested: &str, force: bool
     let client = Client::builder()
         .user_agent(concat!("fabricaup/", env!("CARGO_PKG_VERSION")))
         .build()?;
-    let release = fetch_release(&client, repo, requested)?;
+    let target = target_triple()?;
+    let extension = if cfg!(windows) { "zip" } else { "tar.gz" };
+    let asset_base = format!("{tool}-{target}");
+    let archive_name = format!("{asset_base}.{extension}");
+    let checksum_name = format!("{asset_base}.sha256");
+    let release = fetch_release(&client, repo, requested, &archive_name, &checksum_name)?;
     validate_version(&release.tag_name)?;
     let version = release.tag_name;
     let destination = layout.toolchain_dir(tool, &version)?;
@@ -166,11 +175,6 @@ fn install(layout: &Layout, tool: &str, repo: &str, requested: &str, force: bool
         return Ok(());
     }
 
-    let target = target_triple()?;
-    let extension = if cfg!(windows) { "zip" } else { "tar.gz" };
-    let asset_base = format!("{tool}-{target}");
-    let archive_name = format!("{asset_base}.{extension}");
-    let checksum_name = format!("{asset_base}.sha256");
     let archive = find_asset(&release.assets, &archive_name)?;
     let checksum = find_asset(&release.assets, &checksum_name)?;
 
@@ -209,22 +213,76 @@ fn install(layout: &Layout, tool: &str, repo: &str, requested: &str, force: bool
     Ok(())
 }
 
-fn fetch_release(client: &Client, repo: &str, requested: &str) -> Result<Release> {
-    let endpoint = if requested == "latest" {
-        format!("https://api.github.com/repos/{repo}/releases/latest")
-    } else {
-        format!("https://api.github.com/repos/{repo}/releases/tags/{requested}")
-    };
+fn release_request(client: &Client, endpoint: String) -> reqwest::blocking::RequestBuilder {
     let mut request = client.get(endpoint);
-    if let Some(token) = std::env::var_os("GITHUB_TOKEN").or_else(|| std::env::var_os("GH_TOKEN")) {
-        request = request.bearer_auth(token.to_string_lossy());
+    let token = std::env::var("GITHUB_TOKEN")
+        .ok()
+        .filter(|token| !token.is_empty())
+        .or_else(|| {
+            std::env::var("GH_TOKEN")
+                .ok()
+                .filter(|token| !token.is_empty())
+        });
+    if let Some(token) = token {
+        request = request.bearer_auth(token);
     }
     request
+}
+
+fn fetch_release(
+    client: &Client,
+    repo: &str,
+    requested: &str,
+    archive_name: &str,
+    checksum_name: &str,
+) -> Result<Release> {
+    if requested == "latest" {
+        let endpoint = format!("https://api.github.com/repos/{repo}/releases?per_page=100");
+        let releases: Vec<Release> = release_request(client, endpoint)
+            .send()?
+            .error_for_status()
+            .with_context(|| format!("failed to list releases in {repo}"))?
+            .json()
+            .context("GitHub returned an invalid release list")?;
+        return select_latest_release(releases, archive_name, checksum_name)
+            .with_context(|| format!("no stable release in {repo} supports this platform"));
+    }
+
+    let endpoint = format!("https://api.github.com/repos/{repo}/releases/tags/{requested}");
+    release_request(client, endpoint)
         .send()?
         .error_for_status()
         .with_context(|| format!("release {requested:?} was not found in {repo}"))?
         .json()
         .context("GitHub returned an invalid release response")
+}
+
+fn stable_version(tag: &str) -> Option<(u64, u64, u64)> {
+    let mut parts = tag.strip_prefix('v')?.split('.');
+    let version = (
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    );
+    parts.next().is_none().then_some(version)
+}
+
+fn select_latest_release(
+    releases: Vec<Release>,
+    archive_name: &str,
+    checksum_name: &str,
+) -> Result<Release> {
+    releases
+        .into_iter()
+        .filter(|release| !release.draft && !release.prerelease)
+        .filter(|release| {
+            find_asset(&release.assets, archive_name).is_ok()
+                && find_asset(&release.assets, checksum_name).is_ok()
+        })
+        .filter_map(|release| stable_version(&release.tag_name).map(|version| (version, release)))
+        .max_by_key(|(version, _)| *version)
+        .map(|(_, release)| release)
+        .context("release list contains no matching stable tool release")
 }
 
 fn find_asset<'a>(assets: &'a [Asset], name: &str) -> Result<&'a Asset> {
@@ -343,12 +401,54 @@ fn is_regular_file(path: &Path) -> bool {
 mod tests {
     use super::*;
 
+    fn release(tag: &str, draft: bool, prerelease: bool, assets: &[&str]) -> Release {
+        Release {
+            tag_name: tag.to_owned(),
+            draft,
+            prerelease,
+            assets: assets
+                .iter()
+                .map(|name| Asset {
+                    name: (*name).to_owned(),
+                    browser_download_url: format!("https://example.test/{name}"),
+                })
+                .collect(),
+        }
+    }
+
     #[test]
     fn validates_repository_names() {
         assert!(validate_repo("fabrica-eda/texo").is_ok());
         assert!(validate_repo("missing-owner").is_err());
         assert!(validate_repo("owner/repo/extra").is_err());
         assert!(validate_repo("owner/../repo").is_err());
+    }
+
+    #[test]
+    fn parses_stable_release_versions() {
+        assert_eq!(stable_version("v1.20.3"), Some((1, 20, 3)));
+        for tag in ["1.20.3", "v1.20", "v1.20.3-rc.1", "txdb-ecp5-v3"] {
+            assert_eq!(stable_version(tag), None, "accepted {tag:?}");
+        }
+    }
+
+    #[test]
+    fn selects_highest_complete_stable_release() -> Result<()> {
+        let archive = "texo-x86_64-unknown-linux-gnu.tar.gz";
+        let checksum = "texo-x86_64-unknown-linux-gnu.sha256";
+        let selected = select_latest_release(
+            vec![
+                release("txdb-ecp5-v3", false, false, &[archive, checksum]),
+                release("v0.3.0", true, false, &[archive, checksum]),
+                release("v0.2.0", false, false, &[archive]),
+                release("v0.1.0", false, false, &[archive, checksum]),
+                release("v0.1.1", false, false, &[archive, checksum]),
+            ],
+            archive,
+            checksum,
+        )?;
+        assert_eq!(selected.tag_name, "v0.1.1");
+        Ok(())
     }
 
     #[test]

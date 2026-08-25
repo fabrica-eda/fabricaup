@@ -47,6 +47,10 @@ executable inside the archive. Override the repository with `--repo owner/name`
 or `FABRICA_DIST_REPO=owner/name`. The default tool can be changed with
 `FABRICAUP_TOOL`, and the installation root with `FABRICAUP_HOME`.
 
+For `latest`, fabricaup selects the highest stable `vMAJOR.MINOR.PATCH` release
+that contains both required assets for the current platform. Auxiliary releases,
+drafts, prereleases, and incomplete platform builds are ignored.
+
 Installed versions and defaults are independent for every tool. Switching the
 active Texo version, for example, does not remove an installed Struo executable
 from `~/.fabrica/bin`.
