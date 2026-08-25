@@ -71,7 +71,7 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 "dist/$asset").Hash.ToLowerInvariant()
           "$hash  $asset" | Set-Content -NoNewline "dist/$asset.sha256"
           Remove-Item -Recurse -Force dist/stage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: fabricaup-${{ matrix.target }}
           path: dist/*
