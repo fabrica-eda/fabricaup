@@ -269,7 +269,13 @@ fn verify_sha256(path: &Path, checksum_file: &str) -> Result<()> {
         }
         hasher.update(&buffer[..count]);
     }
-    let actual = format!("{:x}", hasher.finalize());
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = hasher.finalize();
+    let mut actual = String::with_capacity(digest.len() * 2);
+    for byte in digest.iter().copied() {
+        actual.push(HEX[(byte >> 4) as usize] as char);
+        actual.push(HEX[(byte & 0x0f) as usize] as char);
+    }
     if !actual.eq_ignore_ascii_case(expected) {
         bail!("checksum mismatch for {}", path.display());
     }
