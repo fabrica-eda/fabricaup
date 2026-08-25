@@ -1,8 +1,8 @@
-# Fabrica ツール配布物の契約
+# Fabrica tool distribution contract
 
-`fabricaup --tool <tool>` は、既定で `fabrica-eda/<tool>` の GitHub Release API を
-参照します。公開済み Texo release を基準に、すべての Fabrica ツールで次の asset
-命名を使用します。
+`fabricaup --tool <tool>` uses the `fabrica-eda/<tool>` GitHub Release API by
+default. All managed Fabrica tools follow the asset naming convention already
+used by published Texo releases:
 
 ```text
 <tool>-<target>.tar.gz
@@ -10,15 +10,16 @@
 <tool>-<target>.sha256
 ```
 
-たとえば Linux x86_64 では次の2ファイルです。Release tag は asset 名には含めず、
-GitHub Release 自体の tag（例: `v0.1.0`）でバージョンを選択します。
+For example, a Linux x86_64 Texo release provides these two files. The release
+tag is not included in the asset name; the GitHub Release tag itself, such as
+`v0.1.0`, selects the version.
 
 ```text
 texo-x86_64-unknown-linux-gnu.tar.gz
 texo-x86_64-unknown-linux-gnu.sha256
 ```
 
-`fabricaup` が利用する target:
+Targets recognized by fabricaup:
 
 - `x86_64-unknown-linux-gnu`
 - `aarch64-unknown-linux-gnu`
@@ -26,33 +27,33 @@ texo-x86_64-unknown-linux-gnu.sha256
 - `aarch64-apple-darwin`
 - `x86_64-pc-windows-msvc`
 
-アーカイブは、現在の Texo release のようにトップレベルディレクトリ直下へ
-`<tool>` 実行ファイルを置けます。
+As in current Texo releases, an archive may place the executable directly in a
+top-level package directory:
 
 ```text
 texo-x86_64-unknown-linux-gnu/
-├── texo
-└── README.md
+|-- texo
+`-- README.md
 ```
 
-`bin/<tool>` の形式も利用できます。`fabricaup` はアーカイブから `<tool>`
-（Windows は `<tool>.exe`）だけを取り出し、選択した release の
-`~/.fabrica/toolchains/<tool>/<tag>/bin/` に保存します。
+A `bin/<tool>` layout is also accepted. Fabricaup extracts only `<tool>` or
+`<tool>.exe` on Windows and stores it under
+`~/.fabrica/toolchains/<tool>/<tag>/bin/`.
 
-checksum は Texo release が現在生成している sha256sum 形式です。
+The checksum file uses the standard `sha256sum` format:
 
 ```text
-<64文字のSHA-256>  texo-x86_64-unknown-linux-gnu.tar.gz
+<64-character SHA-256>  texo-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-新しいツールはコード変更なしで追加できます。たとえば `fabrica-eda/struo` がこの
-契約の release assets を公開すれば、次のコマンドで導入できます。
+New tools require no fabricaup code changes. If `fabrica-eda/struo` publishes
+assets that follow this contract, users can install it with:
 
 ```sh
 fabricaup install --tool struo
 ```
 
-フォークした release のスモークテスト:
+Smoke-test a release from a fork with an isolated installation root:
 
 ```sh
 FABRICAUP_HOME="$(mktemp -d)" \

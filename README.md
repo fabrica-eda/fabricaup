@@ -1,12 +1,12 @@
 # fabricaup
 
-Fabrica EDA のツールチェーンマネージャーです。Fabrica の各 GitHub Releases から
-OS/CPU に合うツールを取得し、SHA-256 を検証して、ツールごとに複数バージョンを
-切り替えます。既定ツールは Texo です。
+The toolchain manager for Fabrica EDA. It downloads platform-specific tools from
+Fabrica GitHub Releases, verifies their SHA-256 checksums, and manages multiple
+versions independently for each tool. Texo is the default tool.
 
-## インストール
+## Installation
 
-Linux / macOS:
+Linux and macOS:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf \
@@ -19,38 +19,39 @@ Windows PowerShell:
 irm https://raw.githubusercontent.com/fabrica-eda/fabricaup/main/install.ps1 | iex
 ```
 
-インストーラーは `fabricaup` を `~/.fabrica/bin` に置き、PATH を設定し、最新の
-`texo` も導入します。マネージャーだけ導入したい場合は
-`FABRICAUP_INIT_SKIP=1`、PATH を変更したくない場合は
-`FABRICAUP_NO_MODIFY_PATH=1` を設定してください。
+The installer places `fabricaup` in `~/.fabrica/bin`, adds that directory to
+`PATH`, and installs the latest Texo release. Set `FABRICAUP_INIT_SKIP=1` to
+install only the manager, or `FABRICAUP_NO_MODIFY_PATH=1` to leave `PATH`
+unchanged.
 
-## 使い方
+## Usage
 
 ```text
-fabricaup install              # 最新の texo を導入してデフォルトにする
-fabricaup install v0.1.0       # 指定した texo リリースを導入する
-fabricaup update               # 最新版へ更新する
-fabricaup list                 # 導入済みバージョンを表示する
-fabricaup default v0.1.0       # アクティブ版を切り替える
-fabricaup which                # アクティブな texo の場所を表示する
-fabricaup uninstall v0.1.0     # 非アクティブ版を削除する
+fabricaup install                         # Install the latest Texo release
+fabricaup install v0.1.0                  # Install a specific Texo release
+fabricaup update                          # Update Texo to the latest release
+fabricaup list                            # List installed Texo versions
+fabricaup default v0.1.0                  # Select the active Texo version
+fabricaup which                           # Print the active Texo path
+fabricaup uninstall v0.1.0                # Remove an inactive Texo version
 
-fabricaup install --tool struo             # 別ツールの最新版を導入する
-fabricaup install v0.2.0 --tool struo      # 別ツールの指定版を導入する
-fabricaup list --tool struo                # Struo だけを表示する
-fabricaup which --tool struo               # Struo の実行ファイルを表示する
+fabricaup install --tool struo            # Install another Fabrica tool
+fabricaup install v0.2.0 --tool struo     # Install a specific tool release
+fabricaup list --tool struo               # List only Struo versions
+fabricaup which --tool struo              # Print the active Struo path
 ```
 
-`--tool <name>` を指定すると、既定では `fabrica-eda/<name>` の GitHub Releases、
-`<name>-<target>.tar.gz`、`<name>-<target>.sha256`、アーカイブ内の `<name>` 実行
-ファイルを参照します。フォークや異なる配布先は `--repo owner/name` または
-`FABRICA_DIST_REPO=owner/name` で変更できます。既定ツールは `FABRICAUP_TOOL`、
-保存先は `FABRICAUP_HOME` でも変更できます。
+For `--tool <name>`, fabricaup defaults to the `fabrica-eda/<name>` GitHub
+repository, `<name>-<target>.tar.gz`, `<name>-<target>.sha256`, and a `<name>`
+executable inside the archive. Override the repository with `--repo owner/name`
+or `FABRICA_DIST_REPO=owner/name`. The default tool can be changed with
+`FABRICAUP_TOOL`, and the installation root with `FABRICAUP_HOME`.
 
-各ツールの導入済みバージョンとデフォルトは独立しています。たとえば Texo の
-バージョンを切り替えても、導入済みの Struo は `~/.fabrica/bin` に残ります。
+Installed versions and defaults are independent for every tool. Switching the
+active Texo version, for example, does not remove an installed Struo executable
+from `~/.fabrica/bin`.
 
-## 開発
+## Development
 
 ```sh
 cargo fmt --all --check
@@ -58,10 +59,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 ```
 
-CI は通常のテストに加えて、Linux、macOS、Windows で公開中の最新 Texo release を
-実際に取得し、checksum 検証、`texo --version`、`which`、`list` まで実行します。
+CI runs the regular checks and also downloads the latest published Texo release
+on Linux, macOS, and Windows. It verifies the checksum and exercises
+`texo --version`, `fabricaup which`, and `fabricaup list`.
 
-`v*` タグを push すると、Release workflow が Linux x86_64/aarch64、macOS
-x86_64/Apple Silicon、Windows x86_64 向けの `fabricaup` と checksum を GitHub
-Release に公開します。Texo 側が用意する配布物の契約は
-[docs/distribution.md](docs/distribution.md) を参照してください。
+Pushing a `v*` tag runs the release workflow. It publishes `fabricaup` binaries
+and checksums for Linux x86_64/aarch64, macOS x86_64/Apple Silicon, and Windows
+x86_64. See [docs/distribution.md](docs/distribution.md) for the release contract
+used by managed Fabrica tools.

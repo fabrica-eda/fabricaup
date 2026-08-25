@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_tool_names() {
-        for tool in ["", "..", "../texo", "tool/name", "tool name", "ツール"] {
+        for tool in ["", "..", "../texo", "tool/name", "tool name", "tool!"] {
             assert!(validate_tool(tool).is_err(), "accepted {tool:?}");
         }
         assert!(validate_tool("texo-next").is_ok());
