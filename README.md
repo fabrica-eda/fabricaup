@@ -63,7 +63,9 @@ CI runs the regular checks and also downloads the latest published Texo release
 on Linux, macOS, and Windows. It verifies the checksum and exercises
 `texo --version`, `fabricaup which`, and `fabricaup list`.
 
-Pushing a `v*` tag runs the release workflow. It publishes `fabricaup` binaries
-and checksums for Linux x86_64/aarch64, macOS x86_64/Apple Silicon, and Windows
-x86_64. See [docs/distribution.md](docs/distribution.md) for the release contract
-used by managed Fabrica tools.
+Pushing a `v*` tag that matches the workspace package version runs the release
+workflow. For example, workspace version `0.2.0` must be released as `v0.2.0`.
+The workflow publishes `fabricaup` binaries and checksums for Linux
+x86_64/aarch64, macOS x86_64/Apple Silicon, and Windows x86_64. See
+[docs/distribution.md](docs/distribution.md) for the release contract used by
+managed Fabrica tools.

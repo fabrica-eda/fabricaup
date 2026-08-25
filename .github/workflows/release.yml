@@ -3,13 +3,31 @@ name: Release
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify tag matches the package version
+        shell: bash
+        run: |
+          package_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fabricaup") | .version')"
+          expected_tag="v${package_version}"
+          if [[ "$GITHUB_REF_NAME" != "$expected_tag" ]]; then
+            echo "release tag $GITHUB_REF_NAME does not match package version $package_version" >&2
+            exit 1
+          fi
+
   build:
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -78,7 +96,6 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
     steps:
