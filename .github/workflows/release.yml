@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            cross: false
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            cross: true
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            cross: false
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            cross: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            cross: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - uses: taiki-e/install-action@cross
+        if: matrix.cross
+      - name: Build
+        if: matrix.cross == false
+        run: cargo build --locked --release --target ${{ matrix.target }} -p fabricaup
+      - name: Cross-build
+        if: matrix.cross
+        run: cross build --locked --release --target ${{ matrix.target }} -p fabricaup
+      - name: Package Unix asset
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist/stage
+          cp "target/${{ matrix.target }}/release/fabricaup" dist/stage/fabricaup
+          asset="fabricaup-${{ matrix.target }}.tar.gz"
+          tar -C dist/stage -czf "dist/${asset}" fabricaup
+          if command -v sha256sum >/dev/null; then
+            (cd dist && sha256sum "$asset" > "${asset}.sha256")
+          else
+            (cd dist && shasum -a 256 "$asset" > "${asset}.sha256")
+          fi
+          rm -rf dist/stage
+      - name: Package Windows asset
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/stage | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/fabricaup.exe" dist/stage/fabricaup.exe
+          $asset = "fabricaup-${{ matrix.target }}.zip"
+          Compress-Archive -Path dist/stage/fabricaup.exe -DestinationPath "dist/$asset"
+          $hash = (Get-FileHash -Algorithm SHA256 "dist/$asset").Hash.ToLowerInvariant()
+          "$hash  $asset" | Set-Content -NoNewline "dist/$asset.sha256"
+          Remove-Item -Recurse -Force dist/stage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fabricaup-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

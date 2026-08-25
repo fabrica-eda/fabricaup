@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace --all-targets
+      - name: Parse PowerShell installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path install.ps1), [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { throw ($errors -join "`n") }
+
+  installers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse POSIX installer
+        run: sh -n install.sh
+
+  texo-install:
+    name: Install latest Texo release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      FABRICAUP_HOME: ${{ runner.temp }}/fabrica
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Texo through fabricaup
+        run: cargo run --locked --release -p fabricaup -- install --tool texo
+      - name: Verify installed Texo on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          test -x "$FABRICAUP_HOME/bin/texo"
+          "$FABRICAUP_HOME/bin/texo" --version
+          test "$(cargo run --quiet --locked -p fabricaup -- which --tool texo)" = "$FABRICAUP_HOME/bin/texo"
+          cargo run --quiet --locked -p fabricaup -- list --tool texo | grep -E '^texo .+ \(default\)$'
+      - name: Verify installed Texo on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $texo = Join-Path $env:FABRICAUP_HOME 'bin/texo.exe'
+          if (-not (Test-Path -LiteralPath $texo -PathType Leaf)) { throw 'texo.exe is missing' }
+          & $texo --version
+          $which = cargo run --quiet --locked -p fabricaup -- which --tool texo
+          if ([IO.Path]::GetFullPath($which) -ne [IO.Path]::GetFullPath($texo)) {
+            throw "unexpected texo path: $which"
+          }
+          $list = cargo run --quiet --locked -p fabricaup -- list --tool texo
+          if ($list -notmatch '^texo .+ \(default\)$') { throw "unexpected list output: $list" }
