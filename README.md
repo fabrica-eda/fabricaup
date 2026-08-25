@@ -34,6 +34,7 @@ fabricaup list                            # List installed Texo versions
 fabricaup default v0.1.0                  # Select the active Texo version
 fabricaup which                           # Print the active Texo path
 fabricaup uninstall v0.1.0                # Remove an inactive Texo version
+fabricaup self update                     # Update fabricaup itself
 
 fabricaup install --tool struo            # Install another Fabrica tool
 fabricaup install v0.2.0 --tool struo     # Install a specific tool release
@@ -54,6 +55,12 @@ drafts, prereleases, and incomplete platform builds are ignored.
 Installed versions and defaults are independent for every tool. Switching the
 active Texo version, for example, does not remove an installed Struo executable
 from `~/.fabrica/bin`.
+
+`fabricaup self update` downloads the newest compatible fabricaup release,
+verifies its SHA-256 checksum, and replaces the current executable in place. It
+works for installations created by either installer script on every supported
+platform. Updating a protected system-wide executable may require elevated
+permissions.
 
 ## Development
 
