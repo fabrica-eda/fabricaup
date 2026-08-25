@@ -62,6 +62,10 @@ works for installations created by either installer script on every supported
 platform. Updating a protected system-wide executable may require elevated
 permissions.
 
+Versions older than `0.1.2` do not contain the self-update command. Rerun the
+installer once to upgrade an older installation; future releases can then be
+installed with `fabricaup self update`.
+
 ## Development
 
 ```sh
