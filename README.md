@@ -84,3 +84,29 @@ The workflow publishes `fabricaup` binaries and checksums for Linux
 x86_64/aarch64, macOS x86_64/Apple Silicon, and Windows x86_64. See
 [docs/distribution.md](docs/distribution.md) for the release contract used by
 managed Fabrica tools.
+
+## Nix development environment
+
+On x86_64 or aarch64 Linux (including WSL2), enter the pinned development shell:
+
+```sh
+nix develop
+cargo --version
+mbx --version
+cargo test --workspace --locked
+```
+
+Enable Nix flakes and `nix-command` if your installation does not already do so.
+The shell supplies Rust, rustfmt, Clippy, rust-analyzer, C/C++ compilers, CMake,
+pkg-config, OpenSSL, Python and mbx. Rust is pinned by the rust-overlay revision in `flake.lock`. Plain `cargo`
+commands automatically run through mbx's shared build cache; no global Cargo
+configuration or `mbx setup` is required. The mbx package comes from
+[tignear/nix-packages](https://github.com/tignear/nix-packages), pinned in
+`flake.lock`. Existing mbx user configuration is respected.
+
+For automatic activation, install direnv, enable its shell hook, then run
+`direnv allow` in this repository. FPGA target packs, released Fabrica tools,
+and board programming tools still follow the project-specific instructions above.
+
+Update the shared cache package with `nix flake update nix-packages`, or all
+pinned development dependencies with `nix flake update`.

@@ -3,3 +3,8 @@
 /.vscode/
 *.swp
 *.tmp
+
+# Local Nix/direnv environment
+/.direnv/
+/result
+/result-*/
